@@ -48,6 +48,8 @@ if __name__ == "__main__":
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
+    # TODO : delete this line
+    exclude_green = cv2.imread('projection_test.jpg')
     cv2.namedWindow("Pick Reference Corners")
     cv2.imshow('Pick Reference Corners', exclude_green)
     cv2.setMouseCallback("Pick Reference Corners", getXY)

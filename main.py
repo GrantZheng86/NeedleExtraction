@@ -117,4 +117,7 @@ if __name__ == '__main__':
     to_correct_path = 'To_Unwarp.jpg'
     restored_image = correct_image(to_correct_path, Orig_mtx, distortion_coeff, new_cam_matrix, False)
     chooseReferencePoints(restored_image)
+    np.save('new_cam_mtx.npy', new_cam_matrix)
+    np.save('cam_mtx.npy', Orig_mtx)
+    np.save('dist_coeff.npy', distortion_coeff)
 
