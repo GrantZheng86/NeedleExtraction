@@ -5,9 +5,9 @@ FILE_NAME = 'Test_image.jpg'
 # ORIGINAL_IMG = cv2.imread('Needle_with_BG/Picture3.jpg')
 ORIGINAL_IMG = cv2.imread(FILE_NAME)
 PHYSICAL_POINTS = [[0, 0, 0],
-           [0, 2, 0],
-           [3.75, 2, 0],
-           [3.75, 0, 0]]
+                   [0, 2, 0],
+                   [3.75, 2, 0],
+                   [3.75, 0, 0]]
 PHYSICAL_POINTS = np.array(PHYSICAL_POINTS, dtype=np.float32)
 
 
@@ -34,6 +34,7 @@ def unwarp(img, image_points, desired_points, imshow=False):
 
     return warped
 
+
 def extract_reference_locations(img, imshow=False):
     img_copy = img.copy()
     THRESH_VALUE = (0, 220, 220)  # Corner pixels is marked in red. Subject to change, all values in HSV
@@ -59,12 +60,14 @@ def extract_reference_locations(img, imshow=False):
 
     return organizeCornerPoints(centroids)
 
+
 def draw(img, corners, imgpts):
     corner = tuple(corners[0].ravel())
-    img = cv2.line(img, corner, tuple(imgpts[0].ravel()), (255,0,0), 5)
-    img = cv2.line(img, corner, tuple(imgpts[1].ravel()), (0,255,0), 5)
-    img = cv2.line(img, corner, tuple(imgpts[2].ravel()), (0,0,255), 5)
+    img = cv2.line(img, corner, tuple(imgpts[0].ravel()), (255, 0, 0), 5)
+    img = cv2.line(img, corner, tuple(imgpts[1].ravel()), (0, 255, 0), 5)
+    img = cv2.line(img, corner, tuple(imgpts[2].ravel()), (0, 0, 255), 5)
     return img
+
 
 def organizeCornerPoints(points):
     """
@@ -96,15 +99,16 @@ def organizeCornerPoints(points):
     return np.array([list(toReturn.get(0)), list(toReturn.get(1)), list(toReturn.get(2)), list(toReturn.get(3))],
                     dtype=np.float32)
 
+
 def findNeedleLocations(img, imshow=False):
     img_bgr = img.copy()
     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    upper_value = (130, 255, 255)
-    lower_value = (120, 200, 200)
+    upper_value = (95, 255, 255)
+    lower_value = (85, 200, 200)
     mask = cv2.inRange(img, lower_value, upper_value)
 
     if imshow:
-        img_bgr = cv2.bitwise_and(mask, img_bgr)
+        img_bgr = cv2.bitwise_and(img_bgr, img_bgr, mask=mask)
         cv2.imshow('Needle Markers', img_bgr)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -116,6 +120,25 @@ def findNeedleLocations(img, imshow=False):
     return centroids
 
 
+def fitNeedleCurvature2D(centroids):
+    assert len(centroids) >= 4  # Required for 4th order polynomial fit
+    x_loc = centroids[:, 0]
+    y_loc = centroids[:, 1]
+
+    func = np.polyfit(x_loc, y_loc, 4)
+    return np.poly1d(func)
+
+def fitNeedleCurvature3D(points):
+
+    assert len(points) >= 4
+    x_loc = points[:, 0]
+    y_loc = points[:, 1]
+    z_loc = points[:, 2]
+
+    func_xy = np.polyfit(x_loc, y_loc, 4)
+    func_xz = np.polyfit(x_loc, z_loc, 4)
+
+    return np.poly1d(func_xy), np.poly1d(func_xz)
 
 
 if __name__ == "__main__":
@@ -129,8 +152,10 @@ if __name__ == "__main__":
     axis = np.float32([[2, 0, 0], [0, 2, 0], [0, 0, -2]]).reshape(-1, 3)
     imgpts, jac = cv2.projectPoints(axis, rvecs, tvecs, cam_mtx, dist_coeff)
     img = draw(ORIGINAL_IMG, image_points, imgpts)
+
     cv2.imshow('img', img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-
+    needleMarkers = findNeedleLocations(img, True)
+    fitting_function = fitNeedleCurvature2D(needleMarkers)
