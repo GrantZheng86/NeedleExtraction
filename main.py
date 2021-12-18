@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 import cv2
 import glob
@@ -6,8 +8,10 @@ clickLocation = []
 
 def find_camera_matrix(images):
 
-    boardH = 9
-    boardW = 6
+    # boardH = 8
+    # boardW = 4
+    boardH = 8
+    boardW = 5
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
     sample_img = images[0]
     _, _, color_channel = sample_img.shape
@@ -105,7 +109,12 @@ def getXY(event, x, y, flags, param):
         clickLocation.append([x, y])
 
 if __name__ == '__main__':
-    image_names = glob.glob('./Camera Calibration/*.JPG')
+    parser = argparse.ArgumentParser(description="Where are the images located")
+    parser.add_argument("--calibration_dir", type=str, required=True)
+    args = parser.parse_args()
+    # image_names = glob.glob('./Actual_Photos/*.JPG')
+    dir = "{}\\*.JPG".format(args.calibration_dir)
+    image_names = glob.glob(dir)
     images = []
 
     for each_name in image_names:
@@ -114,10 +123,10 @@ if __name__ == '__main__':
 
     new_cam_matrix, Orig_mtx, distortion_coeff = find_camera_matrix(images)
 
-    to_correct_path = 'To_Unwarp.jpg'
-    restored_image = correct_image(to_correct_path, Orig_mtx, distortion_coeff, new_cam_matrix, False)
-    chooseReferencePoints(restored_image)
-    np.save('new_cam_mtx.npy', new_cam_matrix)
-    np.save('cam_mtx.npy', Orig_mtx)
-    np.save('dist_coeff.npy', distortion_coeff)
+    # to_correct_path = 'To_Unwarp.jpg'
+    # restored_image = correct_image(to_correct_path, Orig_mtx, distortion_coeff, new_cam_matrix, False)
+    # chooseReferencePoints(restored_image)
+    # np.save('new_cam_mtx.npy', new_cam_matrix)
+    # np.save('cam_mtx.npy', Orig_mtx)
+    # np.save('dist_coeff.npy', distortion_coeff)
 

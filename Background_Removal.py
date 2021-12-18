@@ -27,11 +27,13 @@ def show_clicked_points(image, color=(0, 0, 255)):
 
     return frameCopy
 
-def findGreenBorder(mask):
+
+def findGreenBorder(mask, imshow=False):
     """
     Finds a rectangle that can encircle the boarder of the green background using contour approximation
-    :param mask:
-    :return:
+    :param imshow: Whether to show the bounding box, mainly used for debugging
+    :param mask: The boolean mask for the green region
+    :return: 4 corners of the bounding box for the green region
     """
     dilation_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
     dilated_mask = cv2.dilate(mask, dilation_kernel, iterations=1)
@@ -63,26 +65,31 @@ def findGreenBorder(mask):
     assert l == 4, "While Loop Error"
 
     # Finds the min area rectangle that encircles this shape
-    rect = cv2.minAreaRect(bg_contour)
-    box = cv2.boxPoints(rect)
-    box = np.int0(box)
+    x, y, w, h = cv2.boundingRect(bg_contour)
 
+    if imshow:
+        check = cv2.drawContours(cv2.cvtColor(green_bg, cv2.COLOR_GRAY2BGR), [bg_contour], 0, (0, 0, 255), 2)
+        check = cv2.rectangle(check, (x, y), (x+w, h+y), (0, 255, 0), 2)
+        cv2.imshow('Check', check)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
+    return (x, y, h, w)
 
-    check = cv2.drawContours(cv2.cvtColor(green_bg, cv2.COLOR_GRAY2BGR), [bg_contour], 0, (0, 0, 255), 2)
-    check = cv2.drawContours(check, [box], 0, (0, 255, 0), 2)
-    cv2.imshow('Check', check)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    print()
 
 def backgroundCrop(img, imshow=False):
-    lower_val = (50, 45, 45)
+    """
+    Removes all green pixels, and find out the major green screen where the points of interest are located
+    :param img: a HSV image
+    :param imshow: Whether to show the processed image, mainly for debugging
+    :return: 1. A image with all green pixels removed, in BGR space
+            2. The 4 corners of the green screen background
+    """
+    lower_val = (75, 45, 45)
     upper_val = (90, 255, 255)
 
-
     mask = cv2.inRange(img, lower_val, upper_val)
-    findGreenBorder(mask)
+    green_boarders = findGreenBorder(mask, imshow)
 
     inverse_mask = cv2.bitwise_not(mask)
     exclude_green = cv2.bitwise_and(img, img, mask=inverse_mask)
@@ -90,47 +97,55 @@ def backgroundCrop(img, imshow=False):
 
     if imshow:
         img = np.hstack((img_copy, exclude_green))
-        cv2.imshow('a', img)
+        cv2.imshow('back', img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-    return exclude_green
+    return exclude_green, green_boarders
+
 
 def isolate_markers(img, imshow=False):
     """
     The Hue value for hsv wraps around 0, therefore, two stage masks is needed to isolate the landmarks
-    :param img:
-    :param imshow:
-    :return:
+    :param img: A HSV image
+    :param imshow: Whether to show the mask and masked image, for debugging
+    :return: Returns the landmark only image and filtering mask
     """
-    upper_val = (70, 255, 255)
-    middle_val = (0, 50, 50)
-    lower_val = (200, 30, 30)
+    upper_val = (20, 255, 255)
+    middle_val_2 = (0, 10, 30)
+    middle_val = (179, 255, 255)
+    lower_val = (160, 10, 30)
 
-    mask_1 = cv2.inRange(img, middle_val, upper_val)
+    mask_1 = cv2.inRange(img, middle_val_2, upper_val)
     mask_2 = cv2.inRange(img, lower_val, middle_val)
     mask = cv2.bitwise_or(mask_1, mask_2)
     landmarks_only = cv2.bitwise_and(img, img, mask=mask)
-    landmarks_only = cv2.cvtColor(landmarks_only, cv2.COLOR_HSV2BGR)
 
     if imshow:
-        to_show = np.hstack((img, landmarks_only))
+        to_show = np.hstack((cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), landmarks_only))
         cv2.imshow('Landmarks', to_show)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-    return landmarks_only
-
-
+    return landmarks_only, mask
 
 
 if __name__ == "__main__":
     # image_name = 'Needle_with_BG/Picture3.jpg'
-    image_name = 'Actual_Photos/12_16 cap cal/12_16/2021-12-16_16-22-22.jpg'
+    image_name = 'Actual_Photos/12_17/12_17_gs/2021-12-17_13-39-08.jpg'
 
     img = cv2.imread(image_name)
     img_copy = img.copy()
     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    exclude_green = backgroundCrop(img, False)
-    landmarks_only = isolate_markers(exclude_green, True)
+    exclude_green, green_boarders = backgroundCrop(img, False)
+    x, y, h, w = green_boarders
+    landmarks_only, landmark_mask = isolate_markers(exclude_green, True)
+    green_boarder_only = landmarks_only[y:y+h, x:x+w, :]
+    green_boarder_only_mask = landmark_mask[y:y+h, x:x+w]
+    green_boarder_only_mask = cv2.cvtColor(green_boarder_only_mask, cv2.COLOR_GRAY2BGR)
+    img_boarder_only = img_copy[y:y+h, x:x+w, :]
+
+    cv2.imshow('boarders', np.hstack((green_boarder_only_mask, green_boarder_only, img_boarder_only)))
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 
@@ -154,4 +169,3 @@ if __name__ == "__main__":
                                                                          color=(255, 255, 0))
 
     cv2.imwrite('Test_image.jpg', exclude_green_with_reference_and_needle_marker)
-
