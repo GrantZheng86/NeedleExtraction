@@ -59,7 +59,24 @@ class NeedleMarkers:
         return img
 
     def draw_polyfit_entire_frame(self, img):
-        pass
+        self.draw_polyfit(img)
+        h, w, _ = img.shape
+
+        left_x = np.arange(start=0, stop=self._marker_x[0])
+        left_y = self._f(left_x)
+        left_y = left_y.astype(np.int32)
+        right_x = np.arange(start=self._marker_x[-1], stop=w)
+        right_y = self._f(right_x)
+        right_y = right_y.astype(np.int32)
+
+        for i in range(len(left_x) - 1):
+            img = cv2.line(img, (left_x[i], left_y[i]), (left_x[i+1], left_y[i+1]), (255, 0, 255), 2)
+
+        for i in range(len(right_x) - 1):
+            img = cv2.line(img, (right_x[i], right_y[i]), (right_x[i+1], right_y[i+1]), (255, 0, 255), 2)
+
+        return img
+
 
 
 
@@ -170,16 +187,18 @@ def getXY(event, x, y, flags, param):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Where are the images located")
-    parser.add_argument("--calibration_dir", type=str)
+    parser.add_argument("--calibration_dir", type=str, required=True)
     parser.add_argument("--image_dir", type=str, required=True)
     args = parser.parse_args()
 
     wrapped_image = WrappedImage(file_name=args.image_dir)
+    wrapped_image.calibrate_image(args.calibration_dir)
     marker_only_image, marker_ends = wrapped_image.color_filter_HSV(upper_bound=(10, 255, 255), lower_bound=(170, 40, 40))
     wrapped_image.draw_marker_on_image(marker_ends)
 
     markers = NeedleMarkers(marker_ends)
-    polyfit_drawing = markers.draw_polyfit(wrapped_image.get_image())
+    # markers.get_polyfit(3)
+    polyfit_drawing = markers.draw_polyfit_entire_frame(wrapped_image.get_image())
     cv2.imshow('Polyfit', polyfit_drawing)
     cv2.imshow('test', marker_only_image)
     cv2.waitKey(0)

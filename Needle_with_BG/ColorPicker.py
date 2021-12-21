@@ -11,6 +11,36 @@ class WrappedImage:
         self._image = cv2.imread(file_name)
         self._color_space = "BGR"
 
+    def calibrate_image(self, calibration_image_path):
+        boardH = 8
+        boardW = 4
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        calibration_image = cv2.imread(calibration_image_path)
+        gray = cv2.cvtColor(calibration_image, cv2.COLOR_BGR2GRAY)
+        ret, corners = cv2.findChessboardCorners(gray, (boardH, boardW), None)
+
+        objpoints = []
+        imgpoints = []
+
+        objp = np.zeros((boardH * boardW, 3), np.float32)
+        objp[:, :2] = np.mgrid[0:boardH, 0:boardW].T.reshape(-1, 2)
+
+        if ret:
+            objpoints.append(objp)
+            corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            imgpoints.append(corners)
+
+            # Draw Corners, disable this after developing is done
+            # cv2.drawChessboardCorners(calibration_image, (boardH, boardW), corners2, ret)
+            # cv2.namedWindow('Chess board corners', cv2.WINDOW_NORMAL)
+            # cv2.imshow('Chess board corners', calibration_image)
+
+            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+            h, w = gray.shape[:2]
+            newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
+            dst = cv2.undistort(self._image, mtx, dist, None, newcameramtx)
+            self._image = dst
+
     def image_dimension(self):
         return self._image.shape
 
@@ -107,7 +137,6 @@ class WrappedImage:
             to_show = cv2.ellipse(to_show, ellipse, (255, 0, 0), 2)
 
         return to_show
-
 
     def draw_marker_on_image(self, markers):
         if self._color_space != "BGR":
