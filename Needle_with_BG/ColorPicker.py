@@ -3,6 +3,7 @@ import argparse
 import cv2
 import numpy as np
 from tkinter import *
+import math
 
 
 class WrappedImage:
@@ -24,6 +25,9 @@ class WrappedImage:
 
         objp = np.zeros((boardH * boardW, 3), np.float32)
         objp[:, :2] = np.mgrid[0:boardH, 0:boardW].T.reshape(-1, 2)
+
+        if not ret:
+            raise Exception("Calibration Failed, make sure there are {}x{} vertices in image".format(boardH, boardW))
 
         if ret:
             objpoints.append(objp)
@@ -90,7 +94,7 @@ class WrappedImage:
         if self._color_space != "HSV":
             self.change_to_HSV()
 
-        if upper_bound[0] < lower_bound[1]:
+        if upper_bound[0] < lower_bound[0]:
             upper_bound_floor_hue = 0
             lower_bound_celling_hue = 180
 
@@ -104,7 +108,10 @@ class WrappedImage:
 
         kernel = np.ones((5, 5), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        cv2.imshow('mask', cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))
         mask = WrappedImage.process_mask(mask, 6)
+
         bounding_rect_list = WrappedImage.find_bounding_rect(mask)
         bounding_ellipse_list = WrappedImage.find_bounding_ellipse(mask)
         marker_points = WrappedImage.find_end_locations(bounding_rect_list)
@@ -199,19 +206,25 @@ class WrappedImage:
     @staticmethod
     def find_bounding_rect(processed_mask):
         contours, _ = cv2.findContours(processed_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        colored_mask = cv2.cvtColor(processed_mask*255, cv2.COLOR_GRAY2BGR)
         rect_list = []
         for contour in contours:
             rect = cv2.minAreaRect(contour)
             box = cv2.boxPoints(rect)
             box = np.int0(box)
-            box = WrappedImage.organize_corner_points(box)
+            colored_mask = cv2.drawContours(colored_mask, [box],0, (255, 0, 255), 1)
+            box = WrappedImage.organize_corner_points_by_angle(box)
             rect_list.append(box)
+        cv2.imshow('boxes', colored_mask)
 
         return rect_list
 
     @staticmethod
     def find_bounding_ellipse(processed_mask):
         contours, _ = cv2.findContours(processed_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        colored_mask = cv2.cvtColor(processed_mask*255, cv2.COLOR_GRAY2BGR)
+        colored_mask = cv2.drawContours(colored_mask, contours, -1, (0, 255, 0), 3)
+        cv2.imshow('Contours', colored_mask)
         ellipse_list = []
 
         for contour in contours:
@@ -221,7 +234,29 @@ class WrappedImage:
         return ellipse_list
 
     @staticmethod
+    def organize_corner_points_by_angle(point_list):
+        point_list = np.array(point_list)
+        center_point = (np.average(point_list[:, 0]), np.average(point_list[:, 1]))
+
+        point_list_with_angle = []
+        for point in point_list:
+            x = point[0] - center_point[0]
+            y = point[1] - center_point[1]
+
+            angle = math.atan2(y, x) + 2 * math.pi % (2*math.pi)
+            point_list_with_angle.append([point[0], point[1], angle])
+
+        # point_list_with_angle = np.array(point_list_with_angle)
+        point_list_with_angle.sort(key=lambda x: x[-1])
+        to_return = np.array(point_list_with_angle)
+        to_return = to_return[:, :-1]
+        to_return = to_return.astype(np.int32)
+        to_return_reorg = np.roll(to_return, 1, axis=0)
+        return to_return_reorg
+
+    @staticmethod
     def organize_corner_points(point_list):
+        og_pt = WrappedImage.organize_corner_points_by_angle(point_list)
         clickLocations = np.array(point_list)
         center_pt = (np.average(clickLocations[:, 0]), np.average(clickLocations[:, 1]))
 
@@ -243,13 +278,41 @@ class WrappedImage:
         return toReturn
 
     @staticmethod
+    def order_rect_corner_by_distance(corners):
+        distances = []
+        for i in range(3):
+            distance = np.linalg.norm(corners[0] - corners[i+1])
+            distances.append([distance, i+1])
+
+        sorted_list = sorted(distances, key=lambda x:x[0])
+        sorted_list = np.array(sorted_list)
+        sorted_indices = np.array(sorted_list[:, -1], dtype=np.int32)
+
+        a = sorted_indices[0]
+        b = sorted_indices[1]
+        c = sorted_indices[2]
+
+        group_1_x_avg = int(np.average([corners[0][0], corners[a][0]]))
+        group_1_y_avg = int(np.average([corners[0][1], corners[a][1]]))
+
+        group_2_x_avg = int(np.average([corners[b][0], corners[c][0]]))
+        group_2_y_avg = int(np.average([corners[b][1], corners[c][1]]))
+
+        if group_1_x_avg < group_2_x_avg:
+            return group_1_x_avg, group_1_y_avg, group_2_x_avg, group_2_y_avg
+        else:
+            return group_2_x_avg, group_2_y_avg, group_1_x_avg, group_1_y_avg
+
+
+    @staticmethod
     def find_end_locations(bound_rect_list):
         location_list = []
         for rect in bound_rect_list:
-            left_x = int(np.average([rect[0][0], rect[1][0]]))
-            left_y = int(np.average([rect[0][1], rect[1][1]]))
-            right_x = int(np.average([rect[2][0], rect[3][0]]))
-            right_y = int(np.average([rect[2][1], rect[3][1]]))
+            left_x, left_y, right_x, right_y = WrappedImage.order_rect_corner_by_distance(rect)
+            # left_x = int(np.average([rect[0][0], rect[1][0]]))
+            # left_y = int(np.average([rect[0][1], rect[1][1]]))
+            # right_x = int(np.average([rect[2][0], rect[3][0]]))
+            # right_y = int(np.average([rect[2][1], rect[3][1]]))
             location_list.append([(left_x, left_y), (right_x, right_y)])
 
         return location_list
@@ -350,6 +413,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     photo_dir = args.photo_dir
-    # ColorPicker(photo_dir)
-    wrapped_image = WrappedImage(photo_dir)
-    wrapped_image.show_hue_only()
+    ColorPicker(photo_dir)
+    # wrapped_image = WrappedImage(photo_dir)
+    # wrapped_image.show_hue_only()

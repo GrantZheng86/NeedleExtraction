@@ -108,6 +108,9 @@ def find_camera_matrix(images):
             gray = each_image
 
         ret, corners = cv2.findChessboardCorners(gray, (boardH, boardW), None)
+        if not ret:
+            raise Exception("Camera calibration failed, make sure there are {}x{} vertices in the image".format(boardH,
+                                                                                                                boardW))
         print(ret)
 
         if ret:
@@ -193,7 +196,7 @@ if __name__ == '__main__':
 
     wrapped_image = WrappedImage(file_name=args.image_dir)
     wrapped_image.calibrate_image(args.calibration_dir)
-    marker_only_image, marker_ends = wrapped_image.color_filter_HSV(upper_bound=(10, 255, 255), lower_bound=(170, 40, 40))
+    marker_only_image, marker_ends = wrapped_image.color_filter_HSV(upper_bound=(15, 255, 255), lower_bound=(165, 100, 40))
     wrapped_image.draw_marker_on_image(marker_ends)
 
     markers = NeedleMarkers(marker_ends)
