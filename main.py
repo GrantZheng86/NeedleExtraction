@@ -1,4 +1,6 @@
 import argparse
+import os
+import shutil
 
 import numpy as np
 import cv2
@@ -193,19 +195,28 @@ if __name__ == '__main__':
     parser.add_argument("--calibration_dir", type=str, required=True)
     parser.add_argument("--image_dir", type=str, required=True)
     args = parser.parse_args()
+    saving_folder = 'processed_images'
+    saving_dir = os.path.join(args.image_dir, saving_folder)
+    if os.path.exists(saving_dir):
+        shutil.rmtree(saving_dir)
+    os.makedirs(saving_dir)
 
-    wrapped_image = WrappedImage(file_name=args.image_dir)
-    wrapped_image.calibrate_image(args.calibration_dir)
-    marker_only_image, marker_ends = wrapped_image.color_filter_HSV(upper_bound=(15, 255, 255), lower_bound=(165, 100, 40))
-    wrapped_image.draw_marker_on_image(marker_ends)
+    for each_image in glob.glob(os.path.join(args.image_dir, '*.jpg')):
+        short_img_name = each_image.split('\\')[-1]
 
-    markers = NeedleMarkers(marker_ends)
-    # markers.get_polyfit(3)
-    polyfit_drawing = markers.draw_polyfit_entire_frame(wrapped_image.get_image())
-    cv2.imshow('Polyfit', polyfit_drawing)
-    cv2.imshow('test', marker_only_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        wrapped_image = WrappedImage(each_image)
+        wrapped_image.calibrate_image(args.calibration_dir)
+        marker_only_image, marker_ends = wrapped_image.color_filter_HSV(upper_bound=(15, 255, 255), lower_bound=(165, 100, 40))
+        wrapped_image.draw_marker_on_image(marker_ends)
+
+        markers = NeedleMarkers(marker_ends)
+        # markers.get_polyfit(3)
+        polyfit_drawing = markers.draw_polyfit_entire_frame(wrapped_image.get_image())
+        cv2.imwrite(os.path.join(saving_dir, short_img_name), polyfit_drawing)
+    # cv2.imshow('Polyfit', polyfit_drawing)
+    # cv2.imshow('test', marker_only_image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
 
 

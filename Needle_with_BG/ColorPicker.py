@@ -1,9 +1,12 @@
 import argparse
+import glob
+import shutil
 
 import cv2
 import numpy as np
 from tkinter import *
 import math
+import os
 
 
 class WrappedImage:
@@ -109,7 +112,6 @@ class WrappedImage:
         kernel = np.ones((5, 5), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        cv2.imshow('mask', cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))
         mask = WrappedImage.process_mask(mask, 6)
 
         bounding_rect_list = WrappedImage.find_bounding_rect(mask)
@@ -215,7 +217,7 @@ class WrappedImage:
             colored_mask = cv2.drawContours(colored_mask, [box],0, (255, 0, 255), 1)
             box = WrappedImage.organize_corner_points_by_angle(box)
             rect_list.append(box)
-        cv2.imshow('boxes', colored_mask)
+        # cv2.imshow('boxes', colored_mask)
 
         return rect_list
 
@@ -224,7 +226,7 @@ class WrappedImage:
         contours, _ = cv2.findContours(processed_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         colored_mask = cv2.cvtColor(processed_mask*255, cv2.COLOR_GRAY2BGR)
         colored_mask = cv2.drawContours(colored_mask, contours, -1, (0, 255, 0), 3)
-        cv2.imshow('Contours', colored_mask)
+        # cv2.imshow('Contours', colored_mask)
         ellipse_list = []
 
         for contour in contours:
@@ -389,8 +391,8 @@ class ColorPicker:
 
         self.image.change_to_BGR()
         masked_image = cv2.bitwise_and(self.image.get_image(), self.image.get_image(), mask=mask)
-        cv2.imshow('Masked Image', np.hstack((cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), masked_image)))
-        cv2.waitKey(0)
+        # cv2.imshow('Masked Image', np.hstack((cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), masked_image)))
+        # cv2.waitKey(0)
 
     @staticmethod
     def image_value_tester(hue, saturation, value):
@@ -408,11 +410,22 @@ class ColorPicker:
 
 if __name__ == "__main__":
     # ColorPicker.image_value_tester(10, 255, 255)
+    types = ('*.JPG', '*.jpg', '*.png')
+    saving_folder_name = "Processed_images"
     parser = argparse.ArgumentParser(description='Color range adjustment')
     parser.add_argument('--photo_dir', type=str, required=True)
-
     args = parser.parse_args()
     photo_dir = args.photo_dir
+    saving_dir = os.path.join(photo_dir, saving_folder_name)
+    if os.path.exists(saving_dir):
+        shutil.rmtree(saving_dir)
+    os.makedirs(saving_dir)
+
+    for file_types in glob.glob('*.JPG'):
+        print()
+
+
+
     ColorPicker(photo_dir)
     # wrapped_image = WrappedImage(photo_dir)
     # wrapped_image.show_hue_only()
