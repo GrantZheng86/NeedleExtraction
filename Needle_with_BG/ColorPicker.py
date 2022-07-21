@@ -11,8 +11,11 @@ import os
 
 class WrappedImage:
 
-    def __init__(self, file_name):
-        self._image = cv2.imread(file_name)
+    def __init__(self, img_input):
+        if type(img_input) == str:
+            self._image = cv2.imread(img_input)
+        else:
+            self._image = img_input
         self._color_space = "BGR"
 
     def calibrate_image(self, calibration_image_path):
@@ -147,7 +150,7 @@ class WrappedImage:
 
         return to_show
 
-    def draw_marker_on_image(self, markers):
+    def draw_marker_on_image(self, markers, imshow=False):
         if self._color_space != "BGR":
             self.change_to_BGR()
 
@@ -159,9 +162,11 @@ class WrappedImage:
             to_draw = cv2.circle(to_draw, center=left, radius=4, color=(0, 255, 0), thickness=2)
             to_draw = cv2.circle(to_draw, center=right, radius=4, color=(0, 255, 0), thickness=2)
 
-        cv2.imshow('Marker Ends', to_draw)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        if imshow:
+            cv2.imshow('Marker Ends', to_draw)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        return to_draw
 
     def show_image_gradient(self):
 

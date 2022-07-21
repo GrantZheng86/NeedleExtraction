@@ -12,13 +12,15 @@ clickLocation = []
 
 class NeedleMarkers:
 
-    def __init__(self, markers):
+    def __init__(self, markers, fit_order=4):
         markers = np.array(markers)
         assert len(markers.shape) == 3, "Incorrect dimension of markers"
+        self._fit_order = fit_order
         self._markers = markers
         self._marker_x = []
         self._marker_y = []
         self._f = None
+        self._fit_coeff = None
         self._initialize_markers()
         self._poly_fit()
         assert len(self._marker_x)/2 == len(self._markers), "Marker Init failed"
@@ -43,13 +45,14 @@ class NeedleMarkers:
     def get_marker_y(self):
         return self._marker_y
 
-    def _poly_fit(self, order=4):
-        f = np.polyfit(self._marker_x, self._marker_y, order)
+    def _poly_fit(self):
+        f = np.polyfit(self._marker_x, self._marker_y, self._fit_order)
+        self._fit_coeff = f
         self._f = np.poly1d(f)
 
-    def get_polyfit(self, order=4):
-        self._poly_fit(order)
-        return self._f
+    def get_polyfit(self):
+        self._poly_fit()
+        return self._f, self._fit_coeff
 
     def draw_polyfit(self, img):
         y_fits = self._f(self._marker_x)
@@ -189,30 +192,71 @@ def getXY(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         clickLocation.append([x, y])
 
+def webcam_live():
+    vid_0 = cv2.VideoCapture(0)
+    vid_1 = cv2.VideoCapture(1)
+
+    while True:
+        ret, frame = vid_0.read()
+        cv2.imshow('Video 0', frame)
+        ret, frame = vid_1.read()
+        cv2.imshow('Video 1', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    vid_0.release()
+    vid_1.release()
+
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
+
+    vid_0 = cv2.VideoCapture(0)
+    vid_1 = cv2.VideoCapture(1)
+    vid_1_state = True
+    vid_2_state = True
+    vid_state = vid_1_state and vid_2_state
     parser = argparse.ArgumentParser(description="Where are the images located")
     parser.add_argument("--calibration_dir", type=str, required=True)
-    parser.add_argument("--image_dir", type=str, required=True)
     args = parser.parse_args()
+
     saving_folder = 'processed_images'
-    saving_dir = os.path.join(args.image_dir, saving_folder)
+    saving_dir = os.path.join(os.path.dirname(args.calibration_dir), saving_folder)
     if os.path.exists(saving_dir):
         shutil.rmtree(saving_dir)
     os.makedirs(saving_dir)
+    regression_history = []
 
-    for each_image in glob.glob(os.path.join(args.image_dir, '*.jpg')):
-        short_img_name = each_image.split('\\')[-1]
+    while vid_state:
+        ret_1, frame_1 = vid_0.read()
+        ret_2, frame_2 = vid_1.read()
+        vid_state = ret_1 and ret_2
 
-        wrapped_image = WrappedImage(each_image)
-        wrapped_image.calibrate_image(args.calibration_dir)
-        marker_only_image, marker_ends = wrapped_image.color_filter_HSV(upper_bound=(15, 255, 255), lower_bound=(165, 100, 40))
-        wrapped_image.draw_marker_on_image(marker_ends)
+        wrapped_image_1 = WrappedImage(frame_1)
+        wrapped_image_1.calibrate_image(args.calibration_dir)
+        try:
+            marker_only_image_1, marker_ends_1 = wrapped_image_1.color_filter_HSV(upper_bound=(15, 255, 255), lower_bound=(165, 100, 40))
+            img_with_marker_1 = wrapped_image_1.draw_marker_on_image(marker_ends_1)
+            markers_1 = NeedleMarkers(marker_ends_1)
+            polyfit_drawing_1 = markers_1.draw_polyfit_entire_frame(wrapped_image_1.get_image())
+            _, coeff = markers_1.get_polyfit()
+            regression_history.append(coeff)
+            text_to_put = ''
+        except:
+            text_to_put = 'Marked Needle Not in Frame'
 
-        markers = NeedleMarkers(marker_ends)
-        # markers.get_polyfit(3)
-        polyfit_drawing = markers.draw_polyfit_entire_frame(wrapped_image.get_image())
-        cv2.imwrite(os.path.join(saving_dir, short_img_name), polyfit_drawing)
+        img_with_marker_1 = cv2.putText(polyfit_drawing_1, text_to_put, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+        cv2.imshow('Video 1', img_with_marker_1)
+        cv2.imshow('Video 2', frame_2)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    vid_0.release()
+    vid_1.release()
+
+    cv2.destroyAllWindows()
+        # cv2.imwrite(os.path.join(saving_dir, short_img_name), polyfit_drawing)
+
     # cv2.imshow('Polyfit', polyfit_drawing)
     # cv2.imshow('test', marker_only_image)
     # cv2.waitKey(0)
