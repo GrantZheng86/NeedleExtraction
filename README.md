@@ -4,6 +4,10 @@ The "main.py" program is used to find the curvature of a needle based on the mar
 
 Usage:<br />
 The main program taks two required image paths.<br /><br />
---calibration_dir takes a string that points to a checkerboard ***image*** for camera calibration. The checkerboard must have a pattern 8x4. The the checkerboard should also occupy 
+--calibration_dir_1 takes a string that points to a checkerboard ***image*** for camera 1 calibration. The checkerboard must have a pattern 8x4. The the checkerboard should also occupy 
 as much area as possible to ensure a good calculation for camera calibration calculation.<br />
---image_dir takes a string that points to a ***folder*** that contains all the needle images. <br />
+--calibration_dir_2 Same as the previous one. This is for camera 2
+--line_segments The number of marker segments on the needle. This will be used to determine whether to save the regression
+and points for the current frame or not<br />
+<br />
+The saved line regression parameters, line segments, and videos are saved in the same folder as the "Main" file. 
