@@ -6,7 +6,9 @@ import numpy as np
 import cv2
 from Needle_with_BG.ColorPicker import WrappedImage
 import glob
-
+import warnings
+import time
+import pandas as pd
 clickLocation = []
 
 
@@ -23,7 +25,7 @@ class NeedleMarkers:
         self._fit_coeff = None
         self._initialize_markers()
         self._poly_fit()
-        assert len(self._marker_x)/2 == len(self._markers), "Marker Init failed"
+        assert len(self._marker_x) / 2 == len(self._markers), "Marker Init failed"
 
     def _initialize_markers(self):
 
@@ -59,7 +61,8 @@ class NeedleMarkers:
         y_fits = y_fits.astype(np.int32)
 
         for i in range(len(y_fits) - 1):
-            img = cv2.line(img, (self._marker_x[i], y_fits[i]), (self._marker_x[i+1], y_fits[i+1]), (255, 0, 255), 2)
+            img = cv2.line(img, (self._marker_x[i], y_fits[i]), (self._marker_x[i + 1], y_fits[i + 1]), (255, 0, 255),
+                           2)
 
         return img
 
@@ -75,15 +78,12 @@ class NeedleMarkers:
         right_y = right_y.astype(np.int32)
 
         for i in range(len(left_x) - 1):
-            img = cv2.line(img, (left_x[i], left_y[i]), (left_x[i+1], left_y[i+1]), (255, 0, 255), 2)
+            img = cv2.line(img, (left_x[i], left_y[i]), (left_x[i + 1], left_y[i + 1]), (255, 0, 255), 2)
 
         for i in range(len(right_x) - 1):
-            img = cv2.line(img, (right_x[i], right_y[i]), (right_x[i+1], right_y[i+1]), (255, 0, 255), 2)
+            img = cv2.line(img, (right_x[i], right_y[i]), (right_x[i + 1], right_y[i + 1]), (255, 0, 255), 2)
 
         return img
-
-
-
 
 
 def find_camera_matrix(images):
@@ -192,6 +192,7 @@ def getXY(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         clickLocation.append([x, y])
 
+
 def webcam_live():
     vid_0 = cv2.VideoCapture(0)
     vid_1 = cv2.VideoCapture(1)
@@ -209,23 +210,54 @@ def webcam_live():
 
     cv2.destroyAllWindows()
 
+def process_marker_ends(segments, point_ends):
+    if segments != len(point_ends):
+        raise ValueError
+    to_return = []
+    for i in range(segments):
+        to_return.append([(-1, -1), (-1, -1)])
+
+    for i in range(np.min((segments, len(point_ends)))):
+        to_return[i] = point_ends[i]
+    return to_return
+
+
+
 if __name__ == '__main__':
+    fps = 30
+
+    np.seterr(all='warn')
+    warnings.simplefilter('error', np.RankWarning)
 
     vid_0 = cv2.VideoCapture(0)
     vid_1 = cv2.VideoCapture(1)
-    vid_1_state = True
-    vid_2_state = True
-    vid_state = vid_1_state and vid_2_state
+
+    ret_1, frame_1 = vid_0.read()
+    ret_2, frame_2 = vid_1.read()
+
+    if ret_1 and ret_2:
+        r_1, c_1, d_1 = frame_1.shape
+        r_2, c_2, d_2 = frame_2.shape
+
+    frame_1_writer = cv2.VideoWriter('Frame_1.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (c_1, r_1))
+    frame_2_writer = cv2.VideoWriter('Frame_2.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (c_2, r_2))
+    vid_state = ret_1 and ret_2
     parser = argparse.ArgumentParser(description="Where are the images located")
-    parser.add_argument("--calibration_dir", type=str, required=True)
+    parser.add_argument("--calibration_dir_1", type=str, required=True)
+    parser.add_argument("--calibration_dir_2", type=str, required=True)
+    parser.add_argument("--line_segments", type=int, required=True)
     args = parser.parse_args()
+    line_segments = args.line_segments
 
     saving_folder = 'processed_images'
-    saving_dir = os.path.join(os.path.dirname(args.calibration_dir), saving_folder)
+    saving_dir = os.path.join(os.path.dirname(args.calibration_dir_1), saving_folder)
     if os.path.exists(saving_dir):
         shutil.rmtree(saving_dir)
     os.makedirs(saving_dir)
-    regression_history = []
+    regression_history_1 = {}
+    regression_history_2 = {}
+    points_history_1 = {}
+    points_history_2 = {}
 
     while vid_state:
         ret_1, frame_1 = vid_0.read()
@@ -233,38 +265,66 @@ if __name__ == '__main__':
         vid_state = ret_1 and ret_2
 
         wrapped_image_1 = WrappedImage(frame_1)
-        wrapped_image_1.calibrate_image(args.calibration_dir)
+        wrapped_image_2 = WrappedImage(frame_2)
+        wrapped_image_1.calibrate_image(args.calibration_dir_1)
+        wrapped_image_2.calibrate_image(args.calibration_dir_2)
         try:
-            marker_only_image_1, marker_ends_1 = wrapped_image_1.color_filter_HSV(upper_bound=(15, 255, 255), lower_bound=(165, 100, 40))
+            marker_only_image_1, marker_ends_1 = wrapped_image_1.color_filter_HSV(upper_bound=(15, 255, 255),
+                                                                                  lower_bound=(165, 100, 40))
+            marker_only_image_2, marker_ends_2 = wrapped_image_2.color_filter_HSV(upper_bound=(15, 255, 255),
+                                                                                  lower_bound=(165, 100, 40))
             img_with_marker_1 = wrapped_image_1.draw_marker_on_image(marker_ends_1)
+            img_with_marker_2 = wrapped_image_2.draw_marker_on_image(marker_ends_2)
             markers_1 = NeedleMarkers(marker_ends_1)
-            polyfit_drawing_1 = markers_1.draw_polyfit_entire_frame(wrapped_image_1.get_image())
-            _, coeff = markers_1.get_polyfit()
-            regression_history.append(coeff)
+            markers_2 = NeedleMarkers(marker_ends_2)
+            frame_1 = markers_1.draw_polyfit_entire_frame(img_with_marker_1)
+            frame_2 = markers_2.draw_polyfit_entire_frame(img_with_marker_2)
+            _, coeff_1 = markers_1.get_polyfit()
+            _, coeff_2 = markers_2.get_polyfit()
+            time_stamp = time.time()
+            marker_ends_1 = process_marker_ends(line_segments, marker_ends_1)
+            marker_ends_2 = process_marker_ends(line_segments, marker_ends_2)
+            regression_history_1[str(time_stamp)] = coeff_1
+            regression_history_2[str(time_stamp)] = coeff_2
+            points_history_1[str(time_stamp)] = marker_ends_1
+            points_history_2[str(time_stamp)] = marker_ends_2
             text_to_put = ''
-        except:
+        except (cv2.error, AssertionError, RuntimeWarning, np.RankWarning, ValueError) as e:
             text_to_put = 'Marked Needle Not in Frame'
+            print(e)
 
-        img_with_marker_1 = cv2.putText(polyfit_drawing_1, text_to_put, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+        img_with_marker_1 = cv2.putText(frame_1, text_to_put, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2,
+                                        cv2.LINE_AA)
+        img_with_marker_2 = cv2.putText(frame_2, text_to_put, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2,
+                                        cv2.LINE_AA)
         cv2.imshow('Video 1', img_with_marker_1)
-        cv2.imshow('Video 2', frame_2)
+        cv2.imshow('Video 2', img_with_marker_2)
+        frame_1_writer.write(img_with_marker_1)
+        frame_2_writer.write(img_with_marker_2)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     vid_0.release()
     vid_1.release()
+    frame_1_writer.release()
+    frame_2_writer.release()
 
     cv2.destroyAllWindows()
-        # cv2.imwrite(os.path.join(saving_dir, short_img_name), polyfit_drawing)
+    regression_df_1 = pd.DataFrame(regression_history_1)
+    regression_df_2 = pd.DataFrame(regression_history_2)
+    points_df_1 = pd.DataFrame(points_history_1)
+    points_df_2 = pd.DataFrame(points_history_2)
+
+    regression_df_1.to_csv('regression_1.csv')
+    regression_df_2.to_csv('regression_2.csv')
+    points_df_1.to_csv('points_1.csv')
+    points_df_2.to_csv('points_2.csv')
+    # cv2.imwrite(os.path.join(saving_dir, short_img_name), polyfit_drawing)
 
     # cv2.imshow('Polyfit', polyfit_drawing)
     # cv2.imshow('test', marker_only_image)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
-
-
-
-
 
     # # image_names = glob.glob('./Actual_Photos/*.JPG')
     # dir = "{}\\*.JPG".format(args.calibration_dir)

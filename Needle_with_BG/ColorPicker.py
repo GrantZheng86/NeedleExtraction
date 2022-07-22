@@ -199,14 +199,22 @@ class WrappedImage:
             stats[i].append(i)
 
         stats.sort(key=lambda x: x[-2])
-        useful_stats = stats[-1 - marker_count: -1]  # The actual red markers on needle
-        useful_labels = np.array(useful_stats)[:, -1]
+        if len(stats) == 1:
+            useful_stats = stats[0]
+            # useful_labels = np.array(useful_stats)[-1]
+            to_return_mask = np.zeros_like(mask)
+        else:
+            useful_stats = stats[-1 - marker_count: -1]
+            useful_labels = np.array(useful_stats)[:, -1]
+            to_return_mask = np.zeros_like(mask)
+            for label in useful_labels:
+                curr_mask = labels == label
+                curr_mask = curr_mask.astype(np.uint8)
+                to_return_mask = cv2.bitwise_or(to_return_mask, curr_mask)
 
-        to_return_mask = np.zeros_like(mask)
-        for label in useful_labels:
-            curr_mask = labels == label
-            curr_mask = curr_mask.astype(np.uint8)
-            to_return_mask = cv2.bitwise_or(to_return_mask, curr_mask)
+
+
+
 
         return to_return_mask
 
