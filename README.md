@@ -13,5 +13,5 @@ and points for the current frame or not<br />
 The saved line regression parameters, line segments, and videos are saved in the same folder as the "Main" file. 
 <br/>
 
-To install reuired packages, navigate to the "NeedleExtraction" folder and run
+To install required packages, navigate to the "NeedleExtraction" folder and run
 ```pip install -r requirements.txt```

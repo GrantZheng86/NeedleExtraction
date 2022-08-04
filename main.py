@@ -67,13 +67,18 @@ class NeedleMarkers:
         return img
 
     def draw_polyfit_entire_frame(self, img):
-        self.draw_polyfit(img)
+
         h, w, _ = img.shape
 
         left_x = np.arange(start=0, stop=self._marker_x[0])
+        right_x = np.arange(start=self._marker_x[-1], stop=w)
+        x_span = np.arange(start=np.min(self._marker_x), stop=np.max(self._marker_x)+1)
+        y_span = self._f(x_span)
+        y_span = y_span.astype(np.int32)
+
         left_y = self._f(left_x)
         left_y = left_y.astype(np.int32)
-        right_x = np.arange(start=self._marker_x[-1], stop=w)
+
         right_y = self._f(right_x)
         right_y = right_y.astype(np.int32)
 
@@ -82,6 +87,9 @@ class NeedleMarkers:
 
         for i in range(len(right_x) - 1):
             img = cv2.line(img, (right_x[i], right_y[i]), (right_x[i + 1], right_y[i + 1]), (255, 0, 255), 2)
+
+        for i in range(len(x_span) - 1):
+            img = cv2.line(img, (x_span[i], y_span[i]), (x_span[i + 1], y_span[i + 1]), (0, 255, 255), 2)
 
         return img
 
@@ -248,6 +256,7 @@ if __name__ == '__main__':
     parser.add_argument("--line_segments", type=int, required=True)
     args = parser.parse_args()
     line_segments = args.line_segments
+    default_fit_order=4
 
     saving_folder = 'processed_images'
     saving_dir = os.path.join(os.path.dirname(args.calibration_dir_1), saving_folder)
@@ -275,8 +284,8 @@ if __name__ == '__main__':
                                                                                   lower_bound=(165, 100, 40))
             img_with_marker_1 = wrapped_image_1.draw_marker_on_image(marker_ends_1)
             img_with_marker_2 = wrapped_image_2.draw_marker_on_image(marker_ends_2)
-            markers_1 = NeedleMarkers(marker_ends_1)
-            markers_2 = NeedleMarkers(marker_ends_2)
+            markers_1 = NeedleMarkers(marker_ends_1, default_fit_order)
+            markers_2 = NeedleMarkers(marker_ends_2, default_fit_order)
             frame_1 = markers_1.draw_polyfit_entire_frame(img_with_marker_1)
             frame_2 = markers_2.draw_polyfit_entire_frame(img_with_marker_2)
             _, coeff_1 = markers_1.get_polyfit()
@@ -310,10 +319,18 @@ if __name__ == '__main__':
     frame_2_writer.release()
 
     cv2.destroyAllWindows()
+    powers = []
+    for i in range(default_fit_order + 1):
+        powers.append('Power {}'.format(default_fit_order - i))
     regression_df_1 = pd.DataFrame(regression_history_1)
+    regression_df_1['Power'] = powers
+    regression_df_1 = regression_df_1.set_index('Power')
     regression_df_2 = pd.DataFrame(regression_history_2)
+    regression_df_2['Power'] = powers
+    regression_df_2 = regression_df_2.set_index('Power')
     points_df_1 = pd.DataFrame(points_history_1)
     points_df_2 = pd.DataFrame(points_history_2)
+
 
     regression_df_1.to_csv('regression_1.csv')
     regression_df_2.to_csv('regression_2.csv')
