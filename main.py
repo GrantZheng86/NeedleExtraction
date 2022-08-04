@@ -323,11 +323,11 @@ if __name__ == '__main__':
     for i in range(default_fit_order + 1):
         powers.append('Power {}'.format(default_fit_order - i))
     regression_df_1 = pd.DataFrame(regression_history_1)
-    regression_df_1['Power'] = powers
-    regression_df_1 = regression_df_1.set_index('Power')
+    regression_df_1['Unix Time'] = powers
+    regression_df_1 = regression_df_1.set_index('Unix Time')
     regression_df_2 = pd.DataFrame(regression_history_2)
-    regression_df_2['Power'] = powers
-    regression_df_2 = regression_df_2.set_index('Power')
+    regression_df_2['Unix Time'] = powers
+    regression_df_2 = regression_df_2.set_index('Unix Time')
     points_df_1 = pd.DataFrame(points_history_1)
     points_df_2 = pd.DataFrame(points_history_2)
 
