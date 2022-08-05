@@ -14,4 +14,7 @@ The saved line regression parameters, line segments, and videos are saved in the
 <br/>
 
 To install required packages, navigate to the "NeedleExtraction" folder and run
-```pip install -r requirements.txt```
+```pip install -r requirements.txt```  <br/>
+
+The recorded time includes milliseconds, seconds, minutes and hours. When the recorded times are displayed in Excel, the default formatting will not show
+hour. To show the hour information, choose correct format option for each cell.

@@ -7,7 +7,7 @@ import cv2
 from Needle_with_BG.ColorPicker import WrappedImage
 import glob
 import warnings
-import time
+from datetime import datetime
 import pandas as pd
 clickLocation = []
 
@@ -290,7 +290,7 @@ if __name__ == '__main__':
             frame_2 = markers_2.draw_polyfit_entire_frame(img_with_marker_2)
             _, coeff_1 = markers_1.get_polyfit()
             _, coeff_2 = markers_2.get_polyfit()
-            time_stamp = time.time()
+            time_stamp = datetime.now().time()
             marker_ends_1 = process_marker_ends(line_segments, marker_ends_1)
             marker_ends_2 = process_marker_ends(line_segments, marker_ends_2)
             regression_history_1[str(time_stamp)] = coeff_1
@@ -323,13 +323,23 @@ if __name__ == '__main__':
     for i in range(default_fit_order + 1):
         powers.append('Power {}'.format(default_fit_order - i))
     regression_df_1 = pd.DataFrame(regression_history_1)
-    regression_df_1['Unix Time'] = powers
-    regression_df_1 = regression_df_1.set_index('Unix Time')
+    regression_df_1['Time'] = powers
+    regression_df_1 = regression_df_1.set_index('Time')
     regression_df_2 = pd.DataFrame(regression_history_2)
-    regression_df_2['Unix Time'] = powers
-    regression_df_2 = regression_df_2.set_index('Unix Time')
+    regression_df_2['Time'] = powers
+    regression_df_2 = regression_df_2.set_index('Time')
+
+    line_segment_names = []
+    for i in range(line_segments):
+        line_segment_names.append('Segment {}'.format(i))
+
     points_df_1 = pd.DataFrame(points_history_1)
+    points_df_1['Time'] = line_segment_names
+    points_df_1 = points_df_1.set_index('Time')
+
     points_df_2 = pd.DataFrame(points_history_2)
+    points_df_2['Time'] = line_segment_names
+    points_df_2 = points_df_2.set_index('Time')
 
 
     regression_df_1.to_csv('regression_1.csv')
