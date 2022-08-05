@@ -17,4 +17,6 @@ To install required packages, navigate to the "NeedleExtraction" folder and run
 ```pip install -r requirements.txt```  <br/>
 
 The recorded time includes milliseconds, seconds, minutes and hours. When the recorded times are displayed in Excel, the default formatting will not show
-hour. To show the hour information, choose correct format option for each cell.
+hour. To show the hour information, choose correct format option for each cell.<br/>
+ATTENTION: When using polynomial coefficients for fitting, make sure to choose the right data type to avoid overflow issue.
+This is more likely to happen to terms with large power

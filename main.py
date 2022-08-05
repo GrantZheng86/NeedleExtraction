@@ -9,6 +9,7 @@ import glob
 import warnings
 from datetime import datetime
 import pandas as pd
+
 clickLocation = []
 
 
@@ -58,6 +59,7 @@ class NeedleMarkers:
 
     def draw_polyfit(self, img):
         y_fits = self._f(self._marker_x)
+
         y_fits = y_fits.astype(np.int32)
 
         for i in range(len(y_fits) - 1):
@@ -72,7 +74,15 @@ class NeedleMarkers:
 
         left_x = np.arange(start=0, stop=self._marker_x[0])
         right_x = np.arange(start=self._marker_x[-1], stop=w)
-        x_span = np.arange(start=np.min(self._marker_x), stop=np.max(self._marker_x)+1)
+        x_span = np.arange(start=np.min(self._marker_x), stop=np.max(self._marker_x) + 1)
+        x_span = x_span.astype(np.longlong)
+
+
+        # For coefficient verification. Pay extra attention when using, high power will cause overflow issue
+        # k = self._fit_coeff
+        # fitted = lambda x: k[0] * (x ** 4) + k[1] * (x ** 3) + k[2] * (x ** 2) + k[3] * x+ k[4]
+        # y_span = fitted(x_span)
+
         y_span = self._f(x_span)
         y_span = y_span.astype(np.int32)
 
@@ -218,6 +228,7 @@ def webcam_live():
 
     cv2.destroyAllWindows()
 
+
 def process_marker_ends(segments, point_ends):
     if segments != len(point_ends):
         raise ValueError
@@ -228,7 +239,6 @@ def process_marker_ends(segments, point_ends):
     for i in range(np.min((segments, len(point_ends)))):
         to_return[i] = point_ends[i]
     return to_return
-
 
 
 if __name__ == '__main__':
@@ -256,7 +266,7 @@ if __name__ == '__main__':
     parser.add_argument("--line_segments", type=int, required=True)
     args = parser.parse_args()
     line_segments = args.line_segments
-    default_fit_order=4
+    default_fit_order = 4
 
     saving_folder = 'processed_images'
     saving_dir = os.path.join(os.path.dirname(args.calibration_dir_1), saving_folder)
@@ -340,7 +350,6 @@ if __name__ == '__main__':
     points_df_2 = pd.DataFrame(points_history_2)
     points_df_2['Time'] = line_segment_names
     points_df_2 = points_df_2.set_index('Time')
-
 
     regression_df_1.to_csv('regression_1.csv')
     regression_df_2.to_csv('regression_2.csv')
